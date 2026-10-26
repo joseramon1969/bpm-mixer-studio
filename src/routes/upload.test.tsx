@@ -6,7 +6,7 @@ import { Studio } from './index'
 vi.mock('../lib/tempo', () => ({ detectTempo: vi.fn() }))
 const decode = vi.fn()
 const play = vi.fn(async () => {})
-const node = () => ({ connect: vi.fn(), gain: { value: 1 }, frequency: { value: 0 }, getByteFrequencyData: vi.fn() })
+const node = () => ({ connect: vi.fn(), gain: { value: 1 }, frequency: { value: 0 }, Q: { value: 1 }, getByteFrequencyData: vi.fn() })
 const buffer = { duration: 180, getChannelData: () => new Float32Array(160) }
 const file = (name: string) => ({ name, arrayBuffer: async () => new ArrayBuffer(8) })
 const picker = () => screen.getAllByLabelText('Agregar música al deck A')[0]

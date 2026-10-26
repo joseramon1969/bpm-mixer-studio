@@ -15,7 +15,7 @@ class FakeAudio {
   pause = vi.fn(() => { this.paused = true })
   constructor() { audios.push(this) }
 }
-const node = () => ({ connect: vi.fn(), gain: { value: 1 }, frequency: { value: 0 }, getByteFrequencyData: vi.fn() })
+const node = () => ({ connect: vi.fn(), gain: { value: 1 }, frequency: { value: 0 }, Q: { value: 1 }, getByteFrequencyData: vi.fn() })
 beforeEach(() => {
   vi.useFakeTimers()
   audios.length = 0
