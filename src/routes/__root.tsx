@@ -7,9 +7,10 @@ import { NotFoundPage } from '@/components/error-pages'
 import '../styles.css'
 
 const siteName = 'BPM Mixer Studio'
-const siteTitle = 'BPM Mixer Studio | Consola DJ Online'
+const siteTitle = 'BPM Mixer Studio | Mezclador DJ Online Gratis'
 const siteUrl = 'https://bpm-mixer-studio.netlify.app/'
-const siteDescription = 'Mezcla música como un DJ profesional con BPM Mixer Studio. Disfruta de dos decks, sincronización BPM, ecualizador, efectos de sonido, biblioteca musical y automix.'
+const siteDescription =
+  'Mezcla canciones online con una consola DJ virtual gratis. Usa dos decks, sincronización BPM, Auto Mix,'
 const structuredData = {
   '@context': 'https://schema.org',
   '@type': 'WebApplication',
