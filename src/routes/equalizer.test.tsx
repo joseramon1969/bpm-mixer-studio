@@ -18,6 +18,7 @@ beforeEach(() => {
     pause = vi.fn(() => { this.paused = true })
   })
   vi.stubGlobal('AudioContext', class {
+    decodeAudioData = async () => ({ duration: 180, getChannelData: () => new Float32Array(160) })
     destination = {}; currentTime = 0
     resume = vi.fn(async () => {})
     createMediaElementSource = node
@@ -48,6 +49,13 @@ it('applies presets independently, supports KILL restore, and resets all six ban
 it('initializes and connects six audio filters with preselected gains and updates live audio', async () => {
   localStorage.setItem('bpm-playlists', JSON.stringify([[{ name: 'Prueba', url: 'blob:prueba' }], []]))
   render(<Studio />)
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:prueba')
+  await act(async () => {
+    fireEvent.change(screen.getAllByLabelText('Agregar música al deck A')[0], {
+      target: { files: [{ name: 'Prueba.mp3', arrayBuffer: async () => new ArrayBuffer(8) }] },
+    })
+    await new Promise(resolve => setTimeout(resolve, 10))
+  })
   const a = within(screen.getByRole('group', { name: 'Presets de ecualización del deck A' }))
   fireEvent.click(a.getByRole('button', { name: 'Voz' }))
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reproducir o pausar deck A' })) })

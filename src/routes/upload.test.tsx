@@ -69,3 +69,26 @@ it('restores a file in its original playlist position and allows selecting it ag
   fireEvent.change(input, { target: { files: [file('Primera.mp3')] } })
   await waitFor(() => expect(decode).toHaveBeenCalledTimes(2))
 })
+
+
+it.each(['null', '{}', '[[]]', '[[null], []]', 'invalid json'])(
+  'ignores malformed saved playlists: %s',
+  saved => {
+    localStorage.setItem('bpm-playlists', saved)
+    render(<Studio />)
+    expect(screen.getByRole('heading', { name: 'DECK A' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'DECK B' })).toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem('bpm-playlists')!)).toEqual([[], []])
+  },
+)
+
+it('restores only valid local metadata and requires selecting the audio again', async () => {
+  localStorage.setItem('bpm-playlists', JSON.stringify([[{
+    name: 'Guardada', url: 'https://example.com/audio.mp3', bpm: -120, duration: 'invalid',
+  }], []]))
+  render(<Studio />)
+  expect(screen.getByRole('heading', { name: 'Guardada' })).toBeInTheDocument()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reproducir o pausar deck A' })) })
+  expect(play).not.toHaveBeenCalled()
+  expect(JSON.parse(localStorage.getItem('bpm-playlists')!)).toEqual([[{ name: 'Guardada' }], []])
+})
