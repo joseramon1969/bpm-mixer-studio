@@ -15,6 +15,8 @@ class FakeAudio {
   currentTime = 0
   playbackRate = 1
   preservesPitch = false
+  removeAttribute = vi.fn(() => { this.src = '' })
+  load = vi.fn()
   play = vi.fn(async () => { this.paused = false })
   pause = vi.fn(() => { this.paused = true })
   constructor() { audios.push(this) }
