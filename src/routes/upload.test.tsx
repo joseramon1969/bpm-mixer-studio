@@ -29,6 +29,10 @@ beforeEach(() => {
     paused = true
     play = play
     pause = vi.fn()
+    currentTime = 0
+    playbackRate = 1
+    removeAttribute = vi.fn(() => { this.src = '' })
+    load = vi.fn()
   })
   vi.spyOn(URL, 'createObjectURL').mockImplementation(blob => `blob:${(blob as File).name}`)
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
@@ -91,4 +95,41 @@ it('restores only valid local metadata and requires selecting the audio again', 
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reproducir o pausar deck A' })) })
   expect(play).not.toHaveBeenCalled()
   expect(JSON.parse(localStorage.getItem('bpm-playlists')!)).toEqual([[{ name: 'Guardada' }], []])
+})
+
+it('resets cues, loops and tempo when removing the selected song', async () => {
+  render(<Studio />)
+  fireEvent.change(picker(), { target: { files: [file('Primera.mp3'), file('Segunda.mp3')] } })
+  await screen.findByText('2 canción(es) listas.')
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reproducir o pausar deck A' })) })
+  const deck = screen.getByRole('heading', { name: 'DECK A' }).closest('section')!
+  const buttons = Array.from(deck.querySelectorAll('button'))
+  const cue = buttons.find(b => b.textContent === '1')!
+  const loop = buttons.find(b => b.textContent === '4')!
+  fireEvent.click(cue)
+  fireEvent.click(loop)
+  fireEvent.change(screen.getByRole('slider', { name: 'Tempo deck A' }), { target: { value: '1.2' } })
+  expect(cue).toHaveClass('saved')
+  expect(loop).toHaveClass('saved')
+  fireEvent.click(screen.getAllByTitle('Quitar canción')[0])
+  expect(cue).not.toHaveClass('saved')
+  expect(loop).not.toHaveClass('saved')
+  expect(screen.getByRole('slider', { name: 'Tempo deck A' })).toHaveValue('1')
+  expect(screen.getByRole('heading', { name: 'Segunda' })).toBeInTheDocument()
+})
+
+it('stops the previous audio when replacing the loaded file', async () => {
+  vi.spyOn(URL, 'createObjectURL').mockReturnValueOnce('blob:original').mockReturnValueOnce('blob:replacement')
+  render(<Studio />)
+  fireEvent.change(picker(), { target: { files: [file('Tema.mp3')] } })
+  await screen.findByText('1 canción(es) listas.')
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reproducir o pausar deck A' })) })
+  const audio = play.mock.instances[0] as unknown as HTMLAudioElement
+  expect(audio.src).toBe('blob:original')
+  fireEvent.change(picker(), { target: { files: [file('Tema.mp3')] } })
+  await waitFor(() => expect(audio.pause).toHaveBeenCalled())
+  expect(audio.src).toBe('')
+  await screen.findByText('1 canción(es) listas.')
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reproducir o pausar deck A' })) })
+  expect(audio.src).toBe('blob:replacement')
 })
