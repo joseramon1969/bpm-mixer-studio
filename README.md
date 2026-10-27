@@ -1,4 +1,4 @@
-# BPM Mixer Studio
+# bpm demibario mixer
 
 Mezclador de DJ en español para el navegador, con dos decks, análisis local de BPM, forma de onda, ecualización de tres bandas, Kill, filtro, cues, loops, crossfader de potencia constante y fundido automático de ocho segundos. AUTO MIX permanece activo después del primer fundido y alterna entre A y B cuando quedan ocho segundos de reproducción. Prepara la siguiente canción local de la lista del deck saliente y vuelve al inicio de la lista al agotarla; las entradas sin archivo se omiten. Los loops aplazan el siguiente cambio. Para desactivarlo, pulsa DETENER AUTO MIX o mueve el crossfader. Incluye seis efectos sintetizados y sonidos personalizados por sesión.
 

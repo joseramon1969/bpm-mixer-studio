@@ -6,7 +6,7 @@ import { NotFoundPage } from '@/components/error-pages'
 
 import '../styles.css'
 
-const siteName = 'BPM Mixer Studio — La cabina es tuya'
+const siteName = 'bpm demibario mixer — La cabina es tuya'
 const siteDescription = 'Mezcla tu música en el navegador con dos decks, detección de BPM, ecualizador, loops y efectos. Audio 100% local y privado.'
 
 export const Route = createRootRoute({
