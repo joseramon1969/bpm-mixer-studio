@@ -6,42 +6,46 @@ import { NotFoundPage } from '@/components/error-pages'
 
 import '../styles.css'
 
-const siteName = 'bpm demibario mixer — La cabina es tuya'
-const siteDescription = 'Mezcla tu música en el navegador con dos decks, detección de BPM, ecualizador, loops y efectos. Audio 100% local y privado.'
+const siteName = 'BPM Mixer Studio'
+const siteTitle = 'BPM Mixer Studio | Consola DJ Online'
+const siteUrl = 'https://bpm-mixer-studio.netlify.app/'
+const siteDescription = 'Mezcla música como un DJ profesional con BPM Mixer Studio. Disfruta de dos decks, sincronización BPM, ecualizador, efectos de sonido, biblioteca musical y automix.'
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'WebApplication',
+  name: siteName,
+  url: siteUrl,
+  description: 'Consola DJ online para mezclar música con decks, sincronización BPM, ecualizador y efectos de sonido.',
+  applicationCategory: 'MultimediaApplication',
+  operatingSystem: 'Any',
+  browserRequirements: 'Requires JavaScript and a modern web browser',
+  inLanguage: 'es',
+}
 
 export const Route = createRootRoute({
   head: () => ({
     meta: [
-      {
-        charSet: 'utf-8',
-      },
-      {
-        name: 'viewport',
-        content: 'width=device-width, initial-scale=1',
-      },
-      {
-        title: siteName,
-      },
-      {
-        name: 'description',
-        content: siteDescription,
-      },
-      {
-        property: 'og:title',
-        content: siteName,
-      },
-      {
-        property: 'og:description',
-        content: siteDescription,
-      },
-      {
-        property: 'og:type',
-        content: 'website',
-      },
-      {
-        name: 'twitter:card',
-        content: 'summary_large_image',
-      },
+      { charSet: 'utf-8' },
+      { title: siteTitle },
+      { name: 'description', content: siteDescription },
+      { name: 'robots', content: 'index, follow' },
+      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+      { name: 'theme-color', content: '#111318' },
+      { name: 'language', content: 'Spanish' },
+      { name: 'application-name', content: siteName },
+      { property: 'og:type', content: 'website' },
+      { property: 'og:locale', content: 'es_ES' },
+      { property: 'og:site_name', content: siteName },
+      { property: 'og:title', content: 'BPM Mixer Studio | Mezclador DJ Online' },
+      { property: 'og:description', content: 'Tu estudio DJ en línea: mezcla canciones, sincroniza BPM, utiliza efectos y disfruta del automix.' },
+      { property: 'og:url', content: siteUrl },
+      { name: 'twitter:card', content: 'summary' },
+      { name: 'twitter:title', content: siteTitle },
+      { name: 'twitter:description', content: 'Mezcla canciones, sincroniza BPM y utiliza herramientas DJ desde tu navegador.' },
+    ],
+    links: [{ rel: 'canonical', href: siteUrl }],
+    scripts: [
+      { type: 'application/ld+json', children: JSON.stringify(structuredData) },
     ],
   }),
   shellComponent: RootDocument,
