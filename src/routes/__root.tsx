@@ -1,4 +1,4 @@
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
+import { HeadContent, Scripts, createRootRoute, redirect } from '@tanstack/react-router'
 
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -23,6 +23,16 @@ const structuredData = {
 }
 
 export const Route = createRootRoute({
+  beforeLoad: ({ location }) => {
+    const url = new URL(location.href, siteUrl)
+    if (url.searchParams.has('utm_source')) {
+      url.searchParams.delete('utm_source')
+      throw redirect({
+        href: `${url.pathname}${url.search}${url.hash}`,
+        replace: true,
+      })
+    }
+  },
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
