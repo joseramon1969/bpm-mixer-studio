@@ -19,6 +19,8 @@ const EQ_PRESETS = [
  { name: 'Voz', gains: [-4, -2, 3, 4, 1, -2] },
  { name: 'Brillo', gains: [-2, -1, 0, 2, 4, 5] },
 ]
+const eventTime = () => performance.now()
+const noiseSample = () => Math.random()*2-1
 const clock = (v: number) => `${Math.floor(v / 60).toString().padStart(2,'0')}:${Math.floor(v % 60).toString().padStart(2,'0')}`
 export function Studio() {
  const ctx = useRef<AudioContext | null>(null), engines = useRef<(Engine | null)[]>([null,null]);
@@ -28,8 +30,15 @@ export function Studio() {
  const fadeRun=useRef(0), mixing=useRef(false);
  const checkAutomix=useRef<(endedDeck?: number) => void>(()=>{});
  const replace = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>, i:number,v:NoInfer<T>) => setter(old=>old.map((x,j)=>j===i?v:x));
- useEffect(()=>{try { const saved=localStorage.getItem('bpm-playlists'); if(saved)setLists(JSON.parse(saved)); }catch{}; return ()=>{fadeRun.current++;if(fade.current)clearInterval(fade.current); engines.current.forEach(e=>e?.audio.pause())}},[]);
- useEffect(()=>{try{localStorage.setItem('bpm-playlists',JSON.stringify(lists.map(l=>l.map(({name,bpm,duration})=>({name,bpm,duration})))))}catch{}},[lists]);
+ useEffect(()=>{try { const saved=localStorage.getItem('bpm-playlists'); if(saved){
+   const parsed:unknown=JSON.parse(saved);
+   if(Array.isArray(parsed)&&parsed.length===2&&parsed.every(list=>Array.isArray(list)&&list.every(track=>track&&typeof track==='object'&&typeof track.name==='string'))){
+    // Restore browser metadata after hydration; the server cannot read localStorage.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLists(parsed.map((list:Track[])=>list.map(track=>({name:track.name,bpm:Number.isFinite(track.bpm)&&track.bpm!>0?track.bpm:undefined,duration:Number.isFinite(track.duration)&&track.duration!>0?track.duration:undefined}))));
+   }
+  } }catch{ /* Ignore unavailable or malformed browser metadata. */ }; const activeEngines=engines.current,runCounter=fadeRun; return ()=>{runCounter.current++;if(fade.current)clearInterval(fade.current); activeEngines.forEach(e=>e?.audio.pause())}},[]);
+ useEffect(()=>{try{localStorage.setItem('bpm-playlists',JSON.stringify(lists.map(l=>l.map(({name,bpm,duration})=>({name,bpm,duration})))))}catch{ /* Private browsing or a full quota must not stop playback. */ }},[lists]);
  function context(){if(!ctx.current)ctx.current=new AudioContext(); void ctx.current.resume();return ctx.current}
  function updateEq(i:number,values:number[]){
   replace(setEq,i,values);
@@ -95,14 +104,6 @@ export function Studio() {
   mixing.current=false;
   if(disable)setAuto(false);
  }
- useEffect(()=>{checkAutomix.current=(endedDeck)=>{
-  if(!auto||mixing.current)return;
-  const i=endedDeck??engines.current.findIndex(e=>Boolean(e&&!e.audio.paused&&!e.audio.ended));
-  if(i<0||loops[i])return;
-  const audio=engines.current[i]!.audio;
-  const duration=Number.isFinite(audio.duration)?audio.duration:lists[i][selected[i]]?.duration;
-  if(endedDeck!==undefined||(duration&&(duration-audio.currentTime)/audio.playbackRate<=8))void automate(true,i);
- };});
  async function automate(continuing=false,endedOrActiveDeck?:number){
   if(auto&&!continuing){stopAutomix();setMessage('AUTO MIX desactivado. Puedes continuar la mezcla manualmente.');return}
   if(mixing.current)return;
@@ -138,10 +139,10 @@ export function Studio() {
    setMessage(`Mezclando automáticamente hacia el deck ${incoming===0?'A':'B'}…`);
    const remaining=(source.audio.duration-source.audio.currentTime)/source.audio.playbackRate;
    const fadeDuration=source.audio.ended?1:Number.isFinite(remaining)?Math.max(1,Math.min(8000,remaining*1000)):8000;
-   const started=performance.now();
+   const started=eventTime();
    fade.current=setInterval(()=>{
     if(run!==fadeRun.current)return;
-    const progress=Math.min(1,(performance.now()-started)/fadeDuration);
+    const progress=Math.min(1,(eventTime()-started)/fadeDuration);
     setCross(start+(target-start)*progress);
     if(progress===1){
      source.audio.pause();
@@ -173,7 +174,15 @@ export function Studio() {
    setMessage('No se pudo iniciar la mezcla. Comprueba que ambos archivos se pueden reproducir y vuelve a intentarlo.');
   }
  }
- function effect(n:number){const c=context();if(n>=6){const t=custom[n-6];if(t?.url){const audio=new Audio(t.url);audio.volume=master/100;void audio.play()}return}const gain=c.createGain();gain.gain.setValueAtTime(.18*master/100,c.currentTime);gain.gain.exponentialRampToValueAtTime(.001,c.currentTime+1.5);gain.connect(c.destination);if(n===2||n===4){const b=c.createBuffer(1,c.sampleRate,c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*(n===2?Math.pow(1-i/d.length,3):1);const source=c.createBufferSource();source.buffer=b;source.connect(gain);source.start()}else{const o=c.createOscillator();o.type=n===1?'sawtooth':'sine';o.frequency.setValueAtTime([600,180,300,880,200,110][n],c.currentTime);o.frequency.exponentialRampToValueAtTime(n===0?1400:70,c.currentTime+1.4);o.connect(gain);o.start();o.stop(c.currentTime+1.5)}}
+ useEffect(()=>{checkAutomix.current=(endedDeck)=>{
+  if(!auto||mixing.current)return;
+  const i=endedDeck??engines.current.findIndex(e=>Boolean(e&&!e.audio.paused&&!e.audio.ended));
+  if(i<0||loops[i])return;
+  const audio=engines.current[i]!.audio;
+  const duration=Number.isFinite(audio.duration)?audio.duration:lists[i][selected[i]]?.duration;
+  if(endedDeck!==undefined||(duration&&(duration-audio.currentTime)/audio.playbackRate<=8))void automate(true,i);
+ };});
+ function effect(n:number){const c=context();if(n>=6){const t=custom[n-6];if(t?.url){const audio=new Audio(t.url);audio.volume=master/100;void audio.play()}return}const gain=c.createGain();gain.gain.setValueAtTime(.18*master/100,c.currentTime);gain.gain.exponentialRampToValueAtTime(.001,c.currentTime+1.5);gain.connect(c.destination);if(n===2||n===4){const b=c.createBuffer(1,c.sampleRate,c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=noiseSample()*(n===2?Math.pow(1-i/d.length,3):1);const source=c.createBufferSource();source.buffer=b;source.connect(gain);source.start()}else{const o=c.createOscillator();o.type=n===1?'sawtooth':'sine';o.frequency.setValueAtTime([600,180,300,880,200,110][n],c.currentTime);o.frequency.exponentialRampToValueAtTime(n===0?1400:70,c.currentTime+1.4);o.connect(gain);o.start();o.stop(c.currentTime+1.5)}}
  const deck=(i:number)=>{const t=lists[i][selected[i]],label=i===0?'A':'B';return <section className={`deck deck-${label}`}><div className="deck-heading"><div><span className="deck-letter">{label}</span><h2>DECK {label}</h2><span className="deck-status">{playing[i]?'REPRODUCIENDO':'EN ESPERA'}</span></div><Headphones size={17}/></div><div className="track-title"><Music2 size={18}/><div><h3>{t?.name||'Tu siguiente gran mezcla'}</h3><p>{t?'Archivo local · Listo para mezclar':'Carga una canción para comenzar'}</p></div><span className="file-type">{t?'LOCAL':'—'}</span></div><div className="wave" onClick={e=>{const audio=engines.current[i]?.audio;if(audio&&t?.duration)audio.currentTime=(e.clientX-e.currentTarget.getBoundingClientRect().left)/e.currentTarget.clientWidth*t.duration}} title="Haz clic para buscar en la canción"><div className="wave-bars">{Array.from({length:110},(_,n)=><span key={n} style={{height:`${t?.wave?Math.max(3,(t.wave[Math.floor(n*160/110)]||0)*240):5+Math.abs(Math.sin(n*1.7)*Math.cos(n*.29))*52}%`,opacity:t?.wave?1:.35}}/>)}</div><div className="playhead" style={{left:`${t?.duration?times[i]/t.duration*100:50}%`}}/><span className="wave-label">{t?'FORMA DE ONDA':'ESPERANDO AUDIO'}</span></div><div className="readouts"><div><small>TIEMPO</small><strong>{clock(times[i])}<em> / {clock(t?.duration||0)}</em></strong></div><div className="bpm"><small>BPM <span>EST.</span></small><strong>{t?.bpm?(t.bpm*rates[i]).toFixed(1):'— —'}<span> BPM</span></strong></div></div><div className="transport"><button title="Volver al inicio" onClick={()=>{const e=engines.current[i];if(e)e.audio.currentTime=0}}><SkipBack size={17}/></button><button className="cue-button" onClick={()=>{stopAutomix();const e=engines.current[i];if(e){e.audio.pause();e.audio.currentTime=cues[i][0]||0;replace(setPlaying,i,false)}}}>CUE</button><button className="play-button" aria-label={`Reproducir o pausar deck ${label}`} onClick={()=>void toggle(i)}>{playing[i]?<Pause size={19}/>:<Play size={19} fill="currentColor"/>}</button><button className="sync-button" onClick={()=>sync(i)}>↔ SYNC</button></div><div className="tempo-row"><span>TEMPO</span><input aria-label={`Tempo deck ${label}`} type="range" min="0.75" max="1.25" step="0.001" value={rates[i]} onChange={e=>{const v=+e.target.value;replace(setRates,i,v);if(engines.current[i])engines.current[i]!.audio.playbackRate=v}}/><b>{((rates[i]-1)*100).toFixed(1)}%</b></div><div className="controls"><div className="equalizer"><div className="section-label">ECUALIZADOR <SlidersHorizontal size={12}/></div><div className="eq-bars">{EQ_BANDS.map((band,j)=><div className="eq-band" key={band.frequency}>
  <output className="eq-value" htmlFor={`eq-${label}-${j}`}>{eq[i][j]>0?'+':''}{eq[i][j]}<small> dB</small></output>
  <div className="eq-fader"><span className="eq-zero" aria-hidden="true"/><input id={`eq-${label}-${j}`} aria-label={`${band.name}, ${band.frequency} Hz, deck ${label}`} aria-orientation="vertical" aria-valuetext={`${eq[i][j]} decibelios`} type="range" min="-40" max="12" step="1" value={eq[i][j]} onChange={e=>updateEq(i,eq[i].map((v,k)=>k===j?+e.target.value:v))}/></div>
