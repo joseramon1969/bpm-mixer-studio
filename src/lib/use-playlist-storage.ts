@@ -7,6 +7,7 @@ const endpoint = '/.netlify/functions/playlists'
 
 export function usePlaylistStorage(lists: LocalTrack[][], onMissing: (count: number) => void) {
   const [ready, setReady] = useState(false)
+  const [removedCount, setRemovedCount] = useState(0)
   const [attempt, setAttempt] = useState(0)
   const [status, setStatus] = useState('Recuperando listas…')
   const [failed, setFailed] = useState(false)
@@ -34,6 +35,7 @@ export function usePlaylistStorage(lists: LocalTrack[][], onMissing: (count: num
           }
         } catch { /* Browser storage may be disabled or malformed. */ }
         try { localStorage.removeItem('bpm-playlists') } catch { /* Storage may be disabled. */ }
+        setRemovedCount(missing)
         if (missing) current.current.onMissing(missing)
         setReady(true)
         setFailed(false)
@@ -72,5 +74,5 @@ export function usePlaylistStorage(lists: LocalTrack[][], onMissing: (count: num
     return () => { clearTimeout(timer); active = false }
   }, [lists, ready, attempt])
 
-  return { status, failed, retry: () => setAttempt(value => value + 1) }
+  return { status, failed, removedCount, retry: () => setAttempt(value => value + 1) }
 }

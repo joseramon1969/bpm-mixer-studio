@@ -185,3 +185,33 @@ it('removes the loaded song on a media error after changing the selection', asyn
   expect(screen.queryByText('Segunda')).not.toBeInTheDocument()
   expect(screen.getByRole('heading', { name: 'Primera' })).toBeInTheDocument()
 })
+
+
+it('persists both decks, removes missing files on return and keeps the warning visible', async () => {
+  let saved: unknown = [[], []]
+  vi.mocked(fetch).mockImplementation(async (_url, init) => {
+    if (init?.method === 'PUT') {
+      saved = JSON.parse(init.body as string)
+      return new Response(null, { status: 204 })
+    }
+    return Response.json(saved)
+  })
+  const firstVisit = render(<Studio />)
+  fireEvent.change(picker(), { target: { files: [file('Primera.mp3')] } })
+  await screen.findByText('1 canción(es) listas.')
+  fireEvent.change(screen.getAllByLabelText('Agregar música al deck B')[0], { target: { files: [file('Segunda.mp3')] } })
+  await waitFor(() => expect(saved).toEqual([
+    [{ name: 'Primera', bpm: 120, duration: 180 }],
+    [{ name: 'Segunda', bpm: 120, duration: 180 }],
+  ]))
+  firstVisit.unmount()
+  const secondVisit = render(<Studio />)
+  expect(await screen.findByRole('alert')).toHaveTextContent('Se han quitado 2 canciones')
+  expect(screen.queryByText('Primera')).not.toBeInTheDocument()
+  expect(screen.queryByText('Segunda')).not.toBeInTheDocument()
+  await waitFor(() => expect(saved).toEqual([[], []]))
+  fireEvent.change(picker(), { target: { files: [file('Nueva.mp3')] } })
+  await screen.findByText('1 canción(es) listas.')
+  expect(screen.getByRole('alert')).toHaveTextContent('Se han quitado 2 canciones')
+  secondVisit.unmount()
+})
