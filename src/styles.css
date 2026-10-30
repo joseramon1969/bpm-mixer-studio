@@ -92,3 +92,9 @@ button:focus-visible, label:focus-within { outline-color: var(--rd-white); }
  .eq-value { font-size: 10px; }
  .eq-frequency { font-size: 10px; }
 }
+
+.playlist-storage { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 1rem; margin: 0 0 1rem; font-size: .75rem; color: #bbc4d3; }
+.playlist-storage > span { color: #b9d5c5; }
+.playlist-storage small { flex-basis: 100%; }
+.playlist-storage button { border: 1px solid currentColor; border-radius: .35rem; padding: .3rem .65rem; background: transparent; color: inherit; cursor: pointer; }
+.playlist-storage button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
