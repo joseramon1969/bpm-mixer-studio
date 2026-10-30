@@ -1,0 +1,66 @@
+{
+  "version": "8",
+  "dialect": "postgres",
+  "id": "2494f1c2-dc8c-4604-9db6-c3ab30506eb5",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "ddl": [
+    {
+      "isRlsEnabled": false,
+      "name": "playlists",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "browser_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "playlists"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "decks",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "playlists"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "playlists"
+    },
+    {
+      "columns": [
+        "browser_id"
+      ],
+      "nameExplicit": false,
+      "name": "playlists_pkey",
+      "schema": "public",
+      "table": "playlists",
+      "entityType": "pks"
+    }
+  ],
+  "renames": []
+}

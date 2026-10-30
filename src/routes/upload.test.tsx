@@ -60,7 +60,7 @@ it('shows completed songs while another file is still decoding and reports parti
   await screen.findByText(/1 canción\(es\) listas.*No se pudo leer: Dañada.mp3/)
 })
 
-it('restores a file in its original playlist position and allows selecting it again', async () => {
+it('allows selecting a local file again after retiring unavailable saved entries', async () => {
   localStorage.setItem('bpm-playlists', JSON.stringify([[{ name: 'Primera', duration: 180 }, { name: 'Segunda', duration: 180 }], []]))
   render(<Studio />)
   const input = picker() as HTMLInputElement
@@ -77,24 +77,61 @@ it('restores a file in its original playlist position and allows selecting it ag
 
 it.each(['null', '{}', '[[]]', '[[null], []]', 'invalid json'])(
   'ignores malformed saved playlists: %s',
-  saved => {
+  async saved => {
     localStorage.setItem('bpm-playlists', saved)
     render(<Studio />)
     expect(screen.getByRole('heading', { name: 'DECK A' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'DECK B' })).toBeInTheDocument()
-    expect(JSON.parse(localStorage.getItem('bpm-playlists')!)).toEqual([[], []])
+    await waitFor(() => expect(localStorage.getItem('bpm-playlists')).toBeNull())
   },
 )
 
-it('restores only valid local metadata and requires selecting the audio again', async () => {
-  localStorage.setItem('bpm-playlists', JSON.stringify([[{
-    name: 'Guardada', url: 'https://example.com/audio.mp3', bpm: -120, duration: 'invalid',
+it('removes saved songs without local audio and never trusts saved URLs', async () => {
+  vi.mocked(fetch).mockResolvedValueOnce(Response.json([[{
+    name: 'Guardada', url: 'https://example.com/audio.mp3', bpm: 120, duration: 180,
   }], []]))
   render(<Studio />)
-  expect(screen.getByRole('heading', { name: 'Guardada' })).toBeInTheDocument()
+  await screen.findByText(/1 canción\(es\) eliminadas de la lista/)
+  expect(screen.queryByRole('heading', { name: 'Guardada' })).not.toBeInTheDocument()
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reproducir o pausar deck A' })) })
   expect(play).not.toHaveBeenCalled()
-  expect(JSON.parse(localStorage.getItem('bpm-playlists')!)).toEqual([[{ name: 'Guardada' }], []])
+  await waitFor(() => expect(fetch).toHaveBeenCalledWith('/.netlify/functions/playlists', expect.objectContaining({
+    method: 'PUT', body: '[[],[]]',
+  })))
+})
+
+it('saves playlist metadata without uploading audio or object URLs', async () => {
+  render(<Studio />)
+  fireEvent.change(picker(), { target: { files: [file('Tema.mp3')] } })
+  await screen.findByText('1 canción(es) listas.')
+  await screen.findByText('Listas guardadas')
+  const writes = vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'PUT')
+  expect(JSON.parse(writes.at(-1)![1]!.body as string)).toEqual([[{ name: 'Tema', bpm: 120, duration: 180 }], []])
+})
+
+it('removes an unsupported audio file but keeps songs when browser playback is blocked', async () => {
+  render(<Studio />)
+  fireEvent.change(picker(), { target: { files: [file('Tema.mp3')] } })
+  await screen.findByText('1 canción(es) listas.')
+  play.mockRejectedValueOnce(new DOMException('blocked', 'NotAllowedError'))
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reproducir o pausar deck A' })) })
+  expect(screen.getByRole('heading', { name: 'Tema' })).toBeInTheDocument()
+  play.mockRejectedValueOnce(new DOMException('missing', 'NotSupportedError'))
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reproducir o pausar deck A' })) })
+  expect(screen.queryByRole('heading', { name: 'Tema' })).not.toBeInTheDocument()
+  expect(screen.getByText(/el archivo no está disponible o no se puede reproducir/)).toBeInTheDocument()
+})
+
+it('reports a failed save and retries the latest playlist', async () => {
+  vi.mocked(fetch).mockImplementation(async (_url, init) => {
+    if (init?.method === 'PUT') return new Response(null, { status: 503 })
+    return Response.json([[], []])
+  })
+  render(<Studio />)
+  await screen.findByText('No se pudieron guardar las listas.')
+  vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 204 }))
+  fireEvent.click(screen.getByRole('button', { name: 'Reintentar guardado' }))
+  await screen.findByText('Listas guardadas')
 })
 
 it('resets cues, loops and tempo when removing the selected song', async () => {
@@ -132,4 +169,19 @@ it('stops the previous audio when replacing the loaded file', async () => {
   await screen.findByText('1 canción(es) listas.')
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reproducir o pausar deck A' })) })
   expect(audio.src).toBe('blob:replacement')
+})
+
+it('removes the loaded song on a media error after changing the selection', async () => {
+  render(<Studio />)
+  fireEvent.change(picker(), { target: { files: [file('Primera.mp3'), file('Segunda.mp3')] } })
+  await screen.findByText('2 canción(es) listas.')
+  fireEvent.click(screen.getByRole('button', { name: /Segunda/ }))
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reproducir o pausar deck A' })) })
+  const audio = play.mock.instances[0] as unknown as HTMLAudioElement
+  await act(async () => {
+    Object.defineProperty(audio, 'error', { value: { code: 4 } })
+    audio.onerror?.call(audio, new Event('error'))
+  })
+  expect(screen.queryByText('Segunda')).not.toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'Primera' })).toBeInTheDocument()
 })
