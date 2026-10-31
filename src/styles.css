@@ -98,3 +98,6 @@ button:focus-visible, label:focus-within { outline-color: var(--rd-white); }
 .playlist-storage small { flex-basis: 100%; }
 .playlist-storage button { border: 1px solid currentColor; border-radius: .35rem; padding: .3rem .65rem; background: transparent; color: inherit; cursor: pointer; }
 .playlist-storage button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+
+.header-actions{display:flex;align-items:center;gap:8px}.install-app{color:#b9c7e6;border-color:#596780;white-space:nowrap}.install-dialog{background:#191a1c;color:#e5e6e9;border-color:#3b414e;max-height:85dvh;overflow-y:auto}.install-dialog h2{font:600 27px 'Barlow Condensed',sans-serif;margin:0}.install-dialog p,.install-dialog li{font-size:13px;line-height:1.7;color:#afb3bd}.install-dialog ul{list-style:disc;padding-left:20px;margin:0}.install-dialog li+li{margin-top:9px}.install-dialog strong{color:#d3ddf0}.install-dialog .help{justify-content:center}
+@media(max-width:600px){header{height:auto;min-height:88px;flex-wrap:wrap;gap:14px;padding-top:16px;padding-bottom:16px}.header-actions{flex-wrap:wrap}.header-actions .help{padding:9px 10px}}
