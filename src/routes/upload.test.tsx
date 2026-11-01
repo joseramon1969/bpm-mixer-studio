@@ -215,3 +215,28 @@ it('persists both decks, removes missing files on return and keeps the warning v
   expect(screen.getByRole('alert')).toHaveTextContent('Se han quitado 2 canciones')
   secondVisit.unmount()
 })
+
+it('loads 25 songs per deck, limits overlapping imports and frees space after removal', async () => {
+  render(<Studio />)
+  fireEvent.change(picker(), { target: { files: Array.from({ length: 24 }, (_, n) => file(`Tema ${n}.mp3`)) } })
+  fireEvent.change(picker(), { target: { files: [file('Última.mp3'), file('Exceso.mp3')] } })
+  await screen.findByText(/Deck A: máximo 25 canciones/, {}, { timeout: 10000 })
+  const playlistA = screen.getByRole('region', { name: 'Lista de canciones del deck A' })
+  expect(playlistA.querySelectorAll('.playlist-track')).toHaveLength(25)
+  expect(screen.queryByText('Exceso')).not.toBeInTheDocument()
+  expect(decode).toHaveBeenCalledTimes(25)
+
+  fireEvent.change(screen.getAllByLabelText('Agregar música al deck B')[0], {
+    target: { files: Array.from({ length: 25 }, (_, n) => file(`Otro ${n}.mp3`)) },
+  })
+  await screen.findByText('25 canción(es) listas.', {}, { timeout: 10000 })
+  expect(screen.getByRole('region', { name: 'Lista de canciones del deck B' }).querySelectorAll('.playlist-track')).toHaveLength(25)
+
+  fireEvent.change(picker(), { target: { files: [file('Última.mp3')] } })
+  await screen.findByText('1 canción(es) listas.')
+  expect(playlistA.querySelectorAll('.playlist-track')).toHaveLength(25)
+  fireEvent.click(playlistA.querySelector('[title="Quitar canción"]')!)
+  fireEvent.change(picker(), { target: { files: [file('Nueva plaza.mp3')] } })
+  await screen.findByText('Nueva plaza')
+  expect(playlistA.querySelectorAll('.playlist-track')).toHaveLength(25)
+}, 20000)
