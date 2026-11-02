@@ -4,6 +4,7 @@ import { detectTempo } from '../lib/tempo'
 import { Studio } from './index'
 
 vi.mock('../lib/tempo', () => ({ detectTempo: vi.fn() }))
+let metadataDuration: number | undefined
 const decode = vi.fn()
 const play = vi.fn(async () => {})
 const node = () => ({ connect: vi.fn(), gain: { value: 1 }, frequency: { value: 0 }, Q: { value: 1 }, getByteFrequencyData: vi.fn() })
@@ -13,6 +14,7 @@ const picker = () => screen.getAllByLabelText('Agregar música al deck A')[0]
 
 beforeEach(() => {
   localStorage.clear()
+  metadataDuration = undefined
   vi.mocked(detectTempo).mockReset().mockReturnValue(120)
   decode.mockReset().mockResolvedValue(buffer)
   vi.stubGlobal('AudioContext', class {
@@ -32,7 +34,17 @@ beforeEach(() => {
     currentTime = 0
     playbackRate = 1
     removeAttribute = vi.fn(() => { this.src = '' })
-    load = vi.fn()
+    preload = ''
+    duration = 0
+    onloadedmetadata: (() => void) | null = null
+    onerror: (() => void) | null = null
+    load = vi.fn(() => {
+      if (!this.src || this.preload !== 'metadata') return
+      queueMicrotask(() => {
+        if (metadataDuration === undefined) this.onerror?.()
+        else { this.duration = metadataDuration; this.onloadedmetadata?.() }
+      })
+    })
   })
   vi.spyOn(URL, 'createObjectURL').mockImplementation(blob => `blob:${(blob as File).name}`)
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
@@ -240,3 +252,30 @@ it('loads 25 songs per deck, limits overlapping imports and frees space after re
   await screen.findByText('Nueva plaza')
   expect(playlistA.querySelectorAll('.playlist-track')).toHaveLength(25)
 }, 20000)
+
+it('imports playable audio when Web Audio decoding fails and continues the queue', async () => {
+  metadataDuration = 215
+  decode.mockRejectedValueOnce(new DOMException('Cannot decode', 'EncodingError'))
+  render(<Studio />)
+  fireEvent.change(picker(), { target: { files: [file('Compatible.m4a'), file('Siguiente.mp3')] } })
+  await screen.findByText(/2 canción\(es\) listas.*1 sin BPM detectado/)
+  expect(screen.getByRole('button', { name: /Compatible/ })).toHaveTextContent('03:35')
+  expect(screen.getByRole('button', { name: /Siguiente/ })).toBeInTheDocument()
+  expect(detectTempo).toHaveBeenCalledOnce()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reproducir o pausar deck A' })) })
+  expect(play).toHaveBeenCalledOnce()
+})
+
+it('continues importing when a decoder never settles', async () => {
+  vi.useFakeTimers()
+  try {
+    metadataDuration = 180
+    decode.mockImplementationOnce(() => new Promise(() => {}))
+    render(<Studio />)
+    fireEvent.change(picker(), { target: { files: [file('Lenta.mp3'), file('Siguiente.mp3')] } })
+    await act(async () => { await vi.advanceTimersByTimeAsync(15100) })
+    expect(screen.getByRole('button', { name: /Lenta/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Siguiente/ })).toBeInTheDocument()
+    expect(screen.getByText(/2 canción\(es\) listas.*1 sin BPM detectado/)).toBeInTheDocument()
+  } finally { vi.useRealTimers() }
+})
