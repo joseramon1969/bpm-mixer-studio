@@ -22,6 +22,30 @@ const EQ_PRESETS = [
  { name: 'Voz', gains: [-4, -2, 3, 4, 1, -2] },
  { name: 'Brillo', gains: [-2, -1, 0, 2, 4, 5] },
 ]
+// Decoding is optional: some browser codecs support playback but not Web Audio analysis.
+function withTimeout<T>(operation: Promise<T>, milliseconds: number): Promise<T> {
+ return new Promise((resolve,reject)=>{
+  const timer=setTimeout(()=>reject(new Error('audio timeout')),milliseconds);
+  operation.then(value=>{clearTimeout(timer);resolve(value)},error=>{clearTimeout(timer);reject(error)});
+ });
+}
+function localDuration(url:string):Promise<number>{
+ return new Promise((resolve,reject)=>{
+  const audio=new Audio();
+  const timer=setTimeout(()=>finish(),10000);
+  function finish(duration?:number){
+   clearTimeout(timer);
+   audio.onloadedmetadata=null;audio.onerror=null;
+   audio.removeAttribute('src');audio.load();
+   if(duration!==undefined)resolve(duration);else reject(new Error('unsupported audio'));
+  }
+  audio.preload='metadata';
+  audio.onloadedmetadata=()=>finish(Number.isFinite(audio.duration)&&audio.duration>0?audio.duration:undefined);
+  audio.onerror=()=>finish();
+  audio.src=url;
+  audio.load();
+ });
+}
 const eventTime = () => performance.now()
 const noiseSample = () => Math.random()*2-1
 const clock = (v: number) => `${Math.floor(v / 60).toString().padStart(2,'0')}:${Math.floor(v % 60).toString().padStart(2,'0')}`
@@ -78,9 +102,15 @@ export function Studio() {
     continue;
    }
    setMessage(`Cargando ${file.name}… (${loaded+failed.length+1}/${pending.length})`);
+   let url:string|undefined;
    try{
-    const buffer=await context().decodeAudioData(await file.arrayBuffer());
-    const track:Track={name,url:URL.createObjectURL(file),duration:buffer.duration};
+    url=URL.createObjectURL(file);
+    let buffer:AudioBuffer|undefined;
+    try{
+     buffer=await withTimeout((async()=>context().decodeAudioData(await file.arrayBuffer()))(),15000);
+    }catch{ /* Try browser playback when analysis cannot decode this file. */ }
+    const duration=buffer?.duration??await localDuration(url);
+    const track:Track={name,url,duration};
     const previous=currentTracks.current[i].find(t=>t.name===track.name);
     if(previous?.url&&engines.current[i]?.audio.src===previous.url){
      stopAutomix(false);
@@ -97,6 +127,7 @@ export function Studio() {
     await new Promise<void>(resolve=>setTimeout(resolve,0));
     let bpm:number|undefined,wave:number[]|undefined;
     try{
+     if(!buffer)throw new Error('analysis unavailable');
      const samples=buffer.getChannelData(0);
      wave=Array.from({length:160},(_,n)=>{
       let sum=0;
@@ -109,7 +140,7 @@ export function Studio() {
     if(!bpm)uncertain++;
     setLists(old=>old.map((list,j)=>j===i?list.map(t=>t.url===track.url?{...t,bpm,wave}:t):list));
     await new Promise<void>(resolve=>setTimeout(resolve,0));
-   }catch{failed.push(file.name)}
+   }catch{if(url)URL.revokeObjectURL(url);failed.push(file.name)}
   }
   setMessage(`${loaded} canción(es) listas.${uncertain?` ${uncertain} sin BPM detectado; puedes reproducirlas.`:''}${skipped?` Deck ${i===0?'A':'B'}: máximo ${MAX_TRACKS_PER_DECK} canciones. Se omitieron ${skipped} archivo(s); quita una canción para agregar otra.`:''}${failed.length?` No se pudo leer: ${failed.join(', ')}. Prueba MP3, WAV u OGG.`:''}`);
  }
